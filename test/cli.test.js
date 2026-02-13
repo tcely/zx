@@ -417,21 +417,44 @@ console.log(a);
   })
 
   describe('internals', () => {
+    // Internal helper to generate mock ImportMeta objects for testing isMain.
+    function makeMockImportMeta(
+      url: string = import.meta.url,
+      main?: boolean
+    ): ImportMeta {
+      const meta = { url } as any
+      // Only add the 'main' key if it's explicitly a boolean.
+      // This perfectly simulates Node.js (key missing) vs Deno (key exists).
+
+      if ('boolean' === typeof main) {
+        meta.main = main
+      }
+
+      return meta as ImportMeta
+    }
+
     test('isMain() checks process entry point', () => {
-      assert.equal(isMain(import.meta.url, __filename), true)
+      assert.equal(isMain(import.meta, __filename), true)
 
       assert.equal(
-        isMain(import.meta.url.replace('.js', '.cjs'), __filename),
-        true
+        isMain(
+          makeMockImportMeta(
+            import.meta.url.replace('.js', '.cjs'),
+          ),
+          __filename,
+        ),
+        true,
       )
 
       try {
         assert.equal(
           isMain(
-            'file:///root/zx/test/cli.test.js',
-            '/root/zx/test/all.test.js'
+            makeMockImportMeta(
+              'file:///root/zx/test/cli.test.js',
+            ),
+            '/root/zx/test/all.test.js',
           ),
-          true
+          true,
         )
         assert.throw()
       } catch (e) {
@@ -440,7 +463,14 @@ console.log(a);
     })
 
     test('isMain() function is running from the wrong path', () => {
-      assert.equal(isMain('///root/zx/test/cli.test.js'), false)
+      assert.equal(
+        isMain(
+          makeMockImportMeta(
+            '///root/zx/test/cli.test.js',
+          ),
+        ),
+        false,
+      )
     })
 
     test('normalizeExt()', () => {
