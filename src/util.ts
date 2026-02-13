@@ -13,8 +13,10 @@
 // limitations under the License.
 
 import path from 'node:path'
-import { type Buffer } from 'node:buffer'
 import process from 'node:process'
+import url from 'node:url'
+import { fs } from './vendor-extra.ts'
+import { type Buffer } from 'node:buffer'
 import { type TSpawnStore } from './vendor-core.ts'
 
 export { isStringLiteral } from './vendor-core.ts'
@@ -27,6 +29,44 @@ export function identity<T>(v: T): T {
 
 export function randomId() {
   return Math.random().toString(36).slice(2)
+}
+
+const getDefaultScriptPath = (): string => {
+  return 'undefined' !== typeof process && process.argv ? process.argv : ''
+}
+
+/**
+ * Robust entry-point detection for Deno, Bun, and Node.js.
+ * @param meta - The import.meta of the module to check (Mandatory).
+ * @param scriptPath - The process entry point path.
+ */
+export function isMain(
+  meta: ImportMeta,
+  scriptPath: string = getDefaultScriptPath()
+): boolean {
+  const m = meta as { main?: boolean }
+
+  // 1. If it's a boolean, the runtime (Deno/Bun) has given a definitive answer.
+  // This is the "fast path" for Deno/JSR.
+  if ('boolean' === typeof m.main) {
+    return m.main
+  }
+
+  // 2. Node.js fallback (meta.main is undefined)
+  if (scriptPath && meta.url.startsWith('file:')) {
+    try {
+      const normalize = (p: string) => {
+        const resolved = fs.realpathSync(p)
+        const parsed = path.parse(resolved)
+        return path.join(parsed.dir, parsed.name)
+      }
+
+      const modulePath = url.fileURLToPath(meta.url)
+      return normalize(modulePath) === normalize(scriptPath)
+    } catch { /* ignored */ }
+  }
+
+  return false
 }
 
 export function isString(obj: any) {
